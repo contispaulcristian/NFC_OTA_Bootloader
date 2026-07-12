@@ -11,8 +11,8 @@ prod/
 
 # -*-*- Architecture Design -*-*-
 # Ignore flowcharts until architecture is finished
-02_Flowcharts/
-03_Bootloader/
+#02_Flowcharts/
+
 
 # -*-*- VS Code Local Settings -*-*-
 .vscode/
