@@ -1,0 +1,32 @@
+# ==============================================================================
+# PROJECT: ATtiny1616 NFC Secure Bootloader
+# EXCLUSIONS: VS Code local environment & AVR-GCC build artifacts
+# ==============================================================================
+
+# -*-*- Build Outputs -*-*-
+# Ignore the entire production folder and any stray object files.
+prod/
+*.o
+*.d
+
+# -*-*- Architecture Design -*-*-
+# Ignore flowcharts until architecture is finished
+02_Flowcharts/
+03_Bootloader/
+
+# -*-*- VS Code Local Settings -*-*-
+.vscode/
+.clang-format
+
+# -*-*- Project Documentation & Scratchpads -*-*-
+# We ignore personal notes and scratchpads to keep the repo formal.
+Notes.txt
+
+# -*-*- Linux / Unix System Junk -*-*-
+# Folder metadata used by file managers (Nautilus/Thunar)
+.directory
+# Temporary swap files if you ever open a file in Vim or Nano
+*.swp
+*~
+# Trash/Recycle bin metadata
+.fuse_hidden*
