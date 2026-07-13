@@ -17,9 +17,12 @@
  * PRIVATE INCLUDES
  *----------------------------------------------------------------------------*/
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <stddef.h>
 #include <avr/cpufunc.h> /* Required for _PROTECTED_WRITE */
 #include "config.h"
+
+#include "../debug.h"
 
 /*----------------------------------------------------------------------------*
  * PRIVATE CONSTANTS & MACROS
@@ -27,7 +30,7 @@
 /* Timeout for safety */
 #define MCAL_NVM_TIMEOUT         0xFFFFU
 
-#define MCAL_NVM_BOOT_SIZE_LIMIT BOOTLOADER_SIZE_BYTES
+#define MCAL_NVM_BOOT_SIZE_LIMIT 0x3000
 #define MCAL_NVM_PAGE_SIZE       FLASH_PAGE_SIZE
 
 /*----------------------------------------------------------------------------*
@@ -84,9 +87,10 @@ Nvm_Status_t Mcal_Nvm_Erase_Page(uint16_t Address)
  */
 Nvm_Status_t Mcal_Nvm_Write_Page(uint16_t Address, const uint8_t *Data)
 {
-    Nvm_Status_t Status = NVM_OK;
-    size_t       Byte_Idx;
-    uint8_t     *Buffer_Ptr = (uint8_t *)Address;
+    Nvm_Status_t      Status = NVM_OK;
+    size_t            Byte_Idx;
+    uint16_t          Mapped_Address = Address + MAPPED_PROGMEM_START;
+    volatile uint8_t *Buffer_Ptr     = (volatile uint8_t *)(Mapped_Address);
 
     /* Safety Lock */
     if (Address < MCAL_NVM_BOOT_SIZE_LIMIT)
@@ -104,17 +108,20 @@ Nvm_Status_t Mcal_Nvm_Write_Page(uint16_t Address, const uint8_t *Data)
         Status = Mcal_Nvm_Execute_Cmd(NVMCTRL_CMD_PAGEBUFCLR_gc);
     }
 
+    NVMCTRL.ADDR = Address;
+    //Status       = Mcal_Nvm_Execute_Cmd(NVMCTRL_CMD_PAGEERASE_gc);
+
     if (Status == NVM_OK)
     {
         /* Load page buffer manually to avoid direct flash writes */
-        NVMCTRL.ADDR = Address;
 
         for (Byte_Idx = 0U; Byte_Idx < ((size_t)MCAL_NVM_PAGE_SIZE); Byte_Idx++)
         {
             Buffer_Ptr[Byte_Idx] = Data[Byte_Idx];
         }
+        //NVMCTRL.ADDR = Address;
         /* Execute Page Write */
-        Status = Mcal_Nvm_Execute_Cmd(NVMCTRL_CMD_PAGEWRITE_gc);
+        Status = Mcal_Nvm_Execute_Cmd(NVMCTRL_CMD_PAGEERASEWRITE_gc);
     }
 
     return Status;
@@ -129,7 +136,7 @@ Nvm_Status_t Mcal_Nvm_Write_Page(uint16_t Address, const uint8_t *Data)
 Nvm_Status_t Mcal_Nvm_Verify_Page(uint16_t Address, const uint8_t *Expected_Data)
 {
     Nvm_Status_t   Status    = NVM_OK;
-    const uint8_t *Flash_Ptr = (const uint8_t *)Address;
+    const uint8_t *Flash_Ptr = (const uint8_t *)(Address + MAPPED_PROGMEM_START);
     size_t         Byte_Idx;
 
     for (Byte_Idx = 0U; ((Byte_Idx < MCAL_NVM_PAGE_SIZE) && (Status == NVM_OK)); Byte_Idx++)
@@ -168,7 +175,20 @@ static Nvm_Status_t Mcal_Nvm_Execute_Cmd(uint8_t Cmd)
     else
     {
         /* Unlock CCP and trigger command */
-        _PROTECTED_WRITE(NVMCTRL.CTRLA, Cmd);
+        //_PROTECTED_WRITE(NVMCTRL.CTRLA, Cmd);
+
+        /* 2. Clear any lingering hardware error flags before we start */
+        NVMCTRL.STATUS = NVMCTRL_WRERROR_bm;
+
+        /* 3. The Strict Hardware Command Sequence */
+        uint8_t global_interrupt_state = SREG;
+        cli(); /* Disable global interrupts */
+
+        // CCP           = 0x9D; /* Unlock Flash (NVMCTRL_KEY_SPM_gc) */
+        // NVMCTRL.CTRLA = Cmd;  /* Trigger the command immediately */
+        ccp_write_spm((void *)&NVMCTRL.CTRLA, Cmd);
+
+        SREG = global_interrupt_state; /* Restore interrupts */
 
         /* Wait for the command to complete and verify */
         Timeout = MCAL_NVM_TIMEOUT;
@@ -180,6 +200,15 @@ static Nvm_Status_t Mcal_Nvm_Execute_Cmd(uint8_t Cmd)
         if (Timeout == 0U)
         {
             Status = NVM_ERR_BUSY;
+        }
+        else if (NVMCTRL.STATUS & NVMCTRL_WRERROR_bm)
+        {
+            Status = NVM_ERR_VERIFY_FAILED;
+
+            /*DEBUG CODE*/
+            //uint8_t StatusReg = NVMCTRL.STATUS;
+            //Blink_Debug(StatusReg, 400);
+            /*DEBUG CODE*/
         }
     }
 
