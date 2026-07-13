@@ -5,8 +5,9 @@
  * @brief     Clock Management Driver.
  * @details   Handles the initialization of the Internal High-Frequency
  *            Oscillator (OSC20M) and manages the Main Clock Prescaler
+ *            to achieve 10MHz operation.
  * @note      Target: ATtiny1616
- * @copyright (c) 2026 Paul Contis. All rights reserved.
+ * @copyright (c) 2026 DIY for Geeks. All rights reserved.
  ******************************************************************************/
 
 /*----------------------------------------------------------------------------*

@@ -18,6 +18,8 @@
  *----------------------------------------------------------------------------*/
 #include <avr/io.h>
 #include <util/delay.h>
+
+#include "port_drv.h" /*debug*/
 /*----------------------------------------------------------------------------*
  * PRIVATE CONSTANTS & MACROS
  *----------------------------------------------------------------------------*/
@@ -37,6 +39,8 @@
  * PRIVATE FUNCTION PROTOTYPES (STATIC)
  *----------------------------------------------------------------------------*/
 static I2c_Status_t I2c_Wait_For_Hardware_Flag(uint8_t Flag_Mask);
+
+void Mcal_I2c_Force_Bus_Reset(void);
 
 /*----------------------------------------------------------------------------*
  * PUBLIC FUNCTION IMPLEMENTATIONS
@@ -132,7 +136,8 @@ I2c_Status_t Mcal_I2c_Read(const I2c_Data_Transfer_t *Data_Structure)
 
     if ((TWI0.MSTATUS & TWI_BUSSTATE_gm) != TWI_BUSSTATE_IDLE_gc)
     {
-        Status = I2C_ERR_BUSY;
+        Mcal_I2c_Force_Bus_Reset();
+        // Status = I2C_ERR_BUSY;
     }
 
     if (Status == I2C_OK)
@@ -200,4 +205,16 @@ static I2c_Status_t I2c_Wait_For_Hardware_Flag(uint8_t Flag_Mask)
     }
 
     return Status;
+}
+
+void Mcal_I2c_Force_Bus_Reset(void)
+{
+    /* Disable the TWI hardware */
+    TWI0.MCTRLA &= ~TWI_ENABLE_bm;
+
+    /* Force the state machine to IDLE */
+    TWI0.MSTATUS = TWI_BUSSTATE_IDLE_gc;
+
+    /* Re-enable the TWI hardware */
+    TWI0.MCTRLA |= TWI_ENABLE_bm;
 }
