@@ -8,6 +8,8 @@
 prod/
 *.o
 *.d
+# Temporary NVM dump used only to verify memory writes 
+flash_dump.bin
 
 # -*-*- Architecture Design -*-*-
 # Ignore flowcharts until architecture is finished
