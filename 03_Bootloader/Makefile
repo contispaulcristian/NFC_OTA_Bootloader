@@ -26,13 +26,14 @@ SRCS = src/main.c \
        src/mcal_lite/i2c_drv.c \
        src/mcal_lite/port_drv.c \
 	   src/mcal_lite/nvm_drv.c \
-	   #src/hal/is31fl3730_driver.c
-       #src/hal/st25dv64k_driver.c \
-	   src/secure/ota_updater.c
+	   src/hal/st25dv64k_driver.c \
+	   src/debug.c
+	   #src/hal/is31fl3730_driver.c \
+	   #src/secure/ota_updater.c
 # WARNING! DO NOT COMPILE! src/fuses.c
 
 # --- Build Rules ---
-.PHONY: all clean flash directories size_report write_fuses
+.PHONY: all clean flash directories size_report write_fuses verify_nvm fuse_boot_4k fuse_boot_clear verify_bootend
 
 all: directories $(TARGET).hex
 	@echo "-----------------------------------------------------"
@@ -124,3 +125,30 @@ clean:
 	@echo "-----------------------"
 	@echo "|   Clean complete.   |"
 	@echo "-----------------------"
+
+
+dump_nvm:
+	@echo "Dumping physical flash memory from ATtiny1616..."
+	avrdude -c atmelice_updi -p t1616 -U flash:r:flash_dump.bin:r
+	@echo "------------------------------------------------"
+	@echo "Inspecting NVM Page at 0x3000:"
+	@echo "------------------------------------------------"
+	hexdump -C -s 0x3000 -n 64 flash_dump.bin
+
+
+# Sets the BOOTEND fuse to 0x10 (16 * 256 = 4096 bytes / 4KB Boot Section)
+fuse_boot_4k:
+	@echo "Configuring ATtiny1616 for 4KB Bootloader Space (BOOTEND = 0x10)..."
+	avrdude -c atmelice_updi -p t1616 -U fuse8:w:0x10:m
+	@echo "Done. Chip is now partitioned for Bootloader."
+
+# Clears the BOOTEND fuse to 0x00 (Factory Default, No Boot Section)
+fuse_boot_clear:
+	@echo "Removing Bootloader Partition (BOOTEND = 0x00)..."
+	avrdude -c atmelice_updi -p t1616 -U fuse8:w:0x00:m
+	@echo "Done. Entire Flash is now Application space."
+
+# Reads the current BOOTEND fuse value
+verify_bootend:
+	@echo "Reading current BOOTEND fuse state:"
+	avrdude -c atmelice_updi -p t1616 -U fuse8:r:-:h
